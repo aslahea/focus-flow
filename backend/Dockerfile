@@ -29,3 +29,4 @@ ENTRYPOINT ["dumb-init", "--"]
 
 # Start the app
 CMD ["node", "src/server.js"]
+// commit marker 7
