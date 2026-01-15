@@ -38,3 +38,4 @@ export const searchTasks = async (query) => {
   const all = await getTasks();
   return all.filter((task) => task.text.toLowerCase().includes(query.toLowerCase()));
 };
+// commit marker 21
