@@ -1,0 +1,20 @@
+[
+  {
+    "id": "1",
+    "text": "Complete project documentation",
+    "completed": false,
+    "createdAt": "2025-12-10T00:00:00.000Z"
+  },
+  {
+    "id": "2",
+    "text": "Review pull requests",
+    "completed": true,
+    "createdAt": "2025-12-10T00:00:00.000Z"
+  },
+  {
+    "id": "3",
+    "text": "Plan sprint tasks",
+    "completed": false,
+    "createdAt": "2025-12-10T00:00:00.000Z"
+  }
+]

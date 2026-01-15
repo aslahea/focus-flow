@@ -1,0 +1,97 @@
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Next.js build output
+.next/
+out/
+
+# Build outputs
+dist/
+build/
+
+# Coverage
+coverage/
+
+# Logs
+*.log
+logs/
+*.local
+
+# Env files
+.env
+.env.*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor directories and files
+.vscode/
+.idea/
+*.sublime-workspace
+
+# Docker
+.dockerignore
+docker-compose.override.yml
+docker-compose.*.local.yml
+
+# Ignore node_modules anywhere in monorepo
+**/node_modules/
+
+# Ignore local service DBs by default (keep write-service DB only if intentional)
+# /backend/task-write-service/db/tasks.json
+
+# Ignore temporary files
+*~
+*.swp
+*.tmp
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Testing
+coverage/
+
+# Production builds
+build/
+dist/
+.next/
+out/
+
+# Misc
+.DS_Store
+.env
+.env.local
+.env.*.local
+*.log
+*.swp
+*.swo
+*~
+
+# Editor directories and files
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Backend
+backend/node_modules/
+backend/.env
+backend/src/db/tasks.json
+
+# Frontend
+frontend/node_modules/
+frontend/.next/
+frontend/.env.local
+
+# IDE
+.vscode/
+.idea/
+// commit marker 1

@@ -1,0 +1,81 @@
+version: "3.9"
+
+services:
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:5000   # 🔥 FIXED
+    container_name: focus-flow-frontend
+    ports:
+      - "3005:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:5000   # 🔥 FIXED
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - focus-flow-network
+      
+  backend:
+    build: ./backend
+    container_name: focus-flow-backend
+    ports:
+      - "5000:5000"
+    environment:
+      - NODE_ENV=development
+      - TASK_READ_URL=http://task-read-service:3001
+      - TASK_WRITE_URL=http://task-write-service:3002
+    depends_on:
+      task-read-service:
+        condition: service_healthy
+      task-write-service:
+        condition: service_healthy
+    networks:
+      - focus-flow-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:5000/health', r => { if (r.statusCode !== 200) process.exit(1); else process.exit(0) })"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  task-read-service:
+    build: ./backend/task-read-service
+    container_name: focus-flow-task-read
+    ports:
+      - "3001:3001"
+    environment:
+      - TASK_WRITE_URL=http://task-write-service:3002
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3001/tasks', r => { if (r.statusCode !== 200) process.exit(1); else process.exit(0) })"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    restart: unless-stopped
+    networks:
+      - focus-flow-network
+
+  task-write-service:
+    build: ./backend/task-write-service
+    container_name: focus-flow-task-write
+    ports:
+      - "3002:3002"
+    volumes:
+      - ./backend/task-write-service/db:/app/db
+    networks:
+      - focus-flow-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3002/tasks', r => { if (r.statusCode !== 200) process.exit(1); else process.exit(0) })"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    restart: unless-stopped
+
+networks:
+  focus-flow-network:
+    driver: bridge
