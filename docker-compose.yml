@@ -18,7 +18,7 @@ services:
     restart: unless-stopped
     networks:
       - focus-flow-network
-      
+
   backend:
     build: ./backend
     container_name: focus-flow-backend
@@ -79,4 +79,3 @@ services:
 networks:
   focus-flow-network:
     driver: bridge
-// commit marker 27

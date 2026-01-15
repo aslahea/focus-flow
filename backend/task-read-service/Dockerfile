@@ -15,4 +15,3 @@ EXPOSE 3001
 
 ENTRYPOINT ["/sbin/tini", "--"]
 CMD ["node", "src/server.js"]
-// commit marker 16

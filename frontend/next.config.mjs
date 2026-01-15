@@ -10,4 +10,3 @@ const nextConfig = {
 }
 
 export default nextConfig
-// commit marker 61
