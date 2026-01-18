@@ -1,87 +1,80 @@
 trigger:
   - main
 
-# Connect the Variable Group we created in Step 1
 variables:
-- group: dockerhub-secrets
+- group: dockerhub-secrets  # <--- Make sure you created this in Library!
 - name: tag
-  value: $(Build.BuildId)
+  value: '$(Build.BuildId)' # Dynamic tagging for production
 - name: dockerHubUsername
-  value: aslahea
+  value: 'aslahea'
 - name: imageRepoFrontend
-  value: focus-flow-frontend
+  value: 'focus-flow-frontend'
 - name: imageRepoBackend
-  value: focus-flow-backend
+  value: 'focus-flow-backend'
 - name: imageRepoTaskRead
-  value: focus-flow-task-read
+  value: 'focus-flow-task-read'
 - name: imageRepoTaskWrite
-  value: focus-flow-task-write
+  value: 'focus-flow-task-write'
 
 pool:
-  name: 'FocusFlowPool' # Ensure this matches the name you gave in Task 2
+  name: 'FocusFlowPool' # Your Ubuntu Self-Hosted Agent
 
 stages:
 
-# -------------------------------
-# STAGE 1: Build & Validate
-# -------------------------------
+# -----------------------------------------------------------
+# STAGE 1: Build & Lint
+# -----------------------------------------------------------
 - stage: Build
-  displayName: 'Build & Validate'
+  displayName: 'Lint & Validate'
   jobs:
   - job: Validate
     steps:
     - checkout: self
-    - bash: |
-        echo "Running Helm lint..."
-        helm lint helm/focus-flow
-      displayName: 'Helm Lint Check'
+    - bash: helm lint helm/focus-flow
+      displayName: 'Verify Helm Charts'
 
-# -------------------------------
+# -----------------------------------------------------------
 # STAGE 2: Docker Build & Push (All 4 Services)
-# -------------------------------
+# -----------------------------------------------------------
 - stage: Docker
-  displayName: 'Docker Build & Push'
+  displayName: 'Build & Push'
   dependsOn: Build
-  condition: succeeded()
   jobs:
-  - job: BuildImages
+  - job: PushImages
     steps:
-    - bash: |
-        echo $(DOCKERHUB_PASSWORD) | docker login -u $(dockerHubUsername) --password-stdin
-      displayName: 'Docker Hub Login'
+    - bash: echo $(DOCKERHUB_PASSWORD) | docker login -u $(dockerHubUsername) --password-stdin
+      displayName: 'Login to Docker Hub'
 
     - bash: |
-        # Build and Push Frontend
+        # Build and Push each service using the dynamic tag
         docker build -t $(dockerHubUsername)/$(imageRepoFrontend):$(tag) ./frontend
         docker push $(dockerHubUsername)/$(imageRepoFrontend):$(tag)
 
-        # Build and Push Backend
         docker build -t $(dockerHubUsername)/$(imageRepoBackend):$(tag) ./backend
         docker push $(dockerHubUsername)/$(imageRepoBackend):$(tag)
 
-        # Build and Push Task-Read
         docker build -t $(dockerHubUsername)/$(imageRepoTaskRead):$(tag) ./task-read-service
         docker push $(dockerHubUsername)/$(imageRepoTaskRead):$(tag)
 
-        # Build and Push Task-Write (STATEFUL)
         docker build -t $(dockerHubUsername)/$(imageRepoTaskWrite):$(tag) ./task-write-service
         docker push $(dockerHubUsername)/$(imageRepoTaskWrite):$(tag)
-      displayName: 'Build & Push All 4 Microservices'
+      displayName: 'Microservices: Build and Push'
 
-# -------------------------------
-# STAGE 3: Deploy to Local Minikube
-# -------------------------------
+# -----------------------------------------------------------
+# STAGE 3: Local Deploy (The Minikube Bridge)
+# -----------------------------------------------------------
 - stage: Deploy
   displayName: 'Deploy to Minikube'
   dependsOn: Docker
-  condition: succeeded()
   jobs:
   - job: LocalDeploy
     steps:
     - bash: |
+        # Use the local agent's kubeconfig to talk to Minikube
         export KUBECONFIG=$HOME/.kube/config
         
-        echo "Updating Helm release..."
+        echo "Starting Helm Upgrade for Focus-Flow Version $(tag)..."
+        
         helm upgrade --install focus-flow helm/focus-flow \
           --namespace focus-flow \
           --create-namespace \
@@ -90,4 +83,4 @@ stages:
           --set taskRead.image.tag=$(tag) \
           --set taskWrite.image.tag=$(tag) \
           --wait
-      displayName: 'Helm Deploy via Local Agent'
+      displayName: 'Deploy via Local Helm'
