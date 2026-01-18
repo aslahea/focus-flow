@@ -53,10 +53,10 @@ stages:
         docker build -t $(dockerHubUsername)/$(imageRepoBackend):$(tag) ./backend
         docker push $(dockerHubUsername)/$(imageRepoBackend):$(tag)
 
-        docker build -t $(dockerHubUsername)/$(imageRepoTaskRead):$(tag) ./task-read-service
+        docker build -t $(dockerHubUsername)/$(imageRepoTaskRead):$(tag) ./backend/task-read-service
         docker push $(dockerHubUsername)/$(imageRepoTaskRead):$(tag)
 
-        docker build -t $(dockerHubUsername)/$(imageRepoTaskWrite):$(tag) ./task-write-service
+        docker build -t $(dockerHubUsername)/$(imageRepoTaskWrite):$(tag) ./backend/task-write-service
         docker push $(dockerHubUsername)/$(imageRepoTaskWrite):$(tag)
       displayName: 'Microservices: Build and Push'
 
