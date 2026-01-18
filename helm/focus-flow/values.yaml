@@ -49,6 +49,9 @@ backend:
     limits:
       cpu: "500m"
       memory: "256Mi"
+  # Optional: explicit frontend origin the backend should allow (set to your frontend URL)
+  # Example: "http://localhost:3000" or "http://192.168.58.2:32688"
+  frontendOrigin: "http://localhost:3000"
 
 taskRead:
   image: aslahea/focus-flow-task-read

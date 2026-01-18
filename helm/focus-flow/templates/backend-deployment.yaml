@@ -48,3 +48,7 @@ spec:
           value: "http://task-read:3001"
         - name: TASK_WRITE_URL
           value: "http://task-write:3002"
+        {{- if .Values.backend.frontendOrigin }}
+        - name: FRONTEND_ORIGIN
+          value: "{{ .Values.backend.frontendOrigin }}"
+        {{- end }}
