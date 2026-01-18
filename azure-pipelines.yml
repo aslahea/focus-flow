@@ -1,8 +1,93 @@
-trigger: none # We don't want it running on every commit yet
+trigger:
+  - main
+
+# Connect the Variable Group we created in Step 1
+variables:
+- group: dockerhub-secrets
+- name: tag
+  value: $(Build.BuildId)
+- name: dockerHubUsername
+  value: aslahea
+- name: imageRepoFrontend
+  value: focus-flow-frontend
+- name: imageRepoBackend
+  value: focus-flow-backend
+- name: imageRepoTaskRead
+  value: focus-flow-task-read
+- name: imageRepoTaskWrite
+  value: focus-flow-task-write
 
 pool:
-  vmImage: ubuntu-latest
+  name: 'FocusFlowPool' # Ensure this matches the name you gave in Task 2
 
-steps:
-- script: echo "Validation check passed!"
-  displayName: 'Dummy Validation'
+stages:
+
+# -------------------------------
+# STAGE 1: Build & Validate
+# -------------------------------
+- stage: Build
+  displayName: 'Build & Validate'
+  jobs:
+  - job: Validate
+    steps:
+    - checkout: self
+    - bash: |
+        echo "Running Helm lint..."
+        helm lint helm/focus-flow
+      displayName: 'Helm Lint Check'
+
+# -------------------------------
+# STAGE 2: Docker Build & Push (All 4 Services)
+# -------------------------------
+- stage: Docker
+  displayName: 'Docker Build & Push'
+  dependsOn: Build
+  condition: succeeded()
+  jobs:
+  - job: BuildImages
+    steps:
+    - bash: |
+        echo $(DOCKERHUB_PASSWORD) | docker login -u $(dockerHubUsername) --password-stdin
+      displayName: 'Docker Hub Login'
+
+    - bash: |
+        # Build and Push Frontend
+        docker build -t $(dockerHubUsername)/$(imageRepoFrontend):$(tag) ./frontend
+        docker push $(dockerHubUsername)/$(imageRepoFrontend):$(tag)
+
+        # Build and Push Backend
+        docker build -t $(dockerHubUsername)/$(imageRepoBackend):$(tag) ./backend
+        docker push $(dockerHubUsername)/$(imageRepoBackend):$(tag)
+
+        # Build and Push Task-Read
+        docker build -t $(dockerHubUsername)/$(imageRepoTaskRead):$(tag) ./task-read-service
+        docker push $(dockerHubUsername)/$(imageRepoTaskRead):$(tag)
+
+        # Build and Push Task-Write (STATEFUL)
+        docker build -t $(dockerHubUsername)/$(imageRepoTaskWrite):$(tag) ./task-write-service
+        docker push $(dockerHubUsername)/$(imageRepoTaskWrite):$(tag)
+      displayName: 'Build & Push All 4 Microservices'
+
+# -------------------------------
+# STAGE 3: Deploy to Local Minikube
+# -------------------------------
+- stage: Deploy
+  displayName: 'Deploy to Minikube'
+  dependsOn: Docker
+  condition: succeeded()
+  jobs:
+  - job: LocalDeploy
+    steps:
+    - bash: |
+        export KUBECONFIG=$HOME/.kube/config
+        
+        echo "Updating Helm release..."
+        helm upgrade --install focus-flow helm/focus-flow \
+          --namespace focus-flow \
+          --create-namespace \
+          --set frontend.image.tag=$(tag) \
+          --set backend.image.tag=$(tag) \
+          --set taskRead.image.tag=$(tag) \
+          --set taskWrite.image.tag=$(tag) \
+          --wait
+      displayName: 'Helm Deploy via Local Agent'
