@@ -95,3 +95,18 @@ frontend/.env.local
 .vscode/
 .idea/
 // commit marker 1
+
+# Helm
+*.tgz
+charts/
+
+# Kubernetes local files
+kubeconfig
+*.kubeconfig
+
+# Helm lint / template output
+helm-output.yaml
+
+# OS
+.DS_Store
+Thumbs.db

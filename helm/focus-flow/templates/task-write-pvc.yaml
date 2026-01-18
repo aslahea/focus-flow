@@ -1,0 +1,15 @@
+{{- if .Values.taskWrite.persistence.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: task-write-pvc
+spec:
+  {{- if .Values.taskWrite.persistence.storageClass }}
+  storageClassName: {{ .Values.taskWrite.persistence.storageClass }}
+  {{- end }}
+  accessModes:
+    - {{ .Values.taskWrite.persistence.accessMode | default "ReadWriteOnce" }}
+  resources:
+    requests:
+      storage: {{ .Values.taskWrite.persistence.size | quote }}
+{{- end }}

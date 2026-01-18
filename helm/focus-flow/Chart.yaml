@@ -1,0 +1,6 @@
+apiVersion: v2
+name: focus-flow
+description: Helm chart for Focus Flow microservices
+type: application
+version: 0.1.0
+appVersion: "1.0"
