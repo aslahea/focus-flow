@@ -1,0 +1,8 @@
+trigger: none # We don't want it running on every commit yet
+
+pool:
+  vmImage: ubuntu-latest
+
+steps:
+- script: echo "Validation check passed!"
+  displayName: 'Dummy Validation'
