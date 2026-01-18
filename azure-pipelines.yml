@@ -1,0 +1,86 @@
+trigger:
+  - main
+
+variables:
+- group: dockerhub-secrets  # <--- Make sure you created this in Library!
+- name: tag
+  value: '$(Build.BuildId)' # Dynamic tagging for production
+- name: dockerHubUsername
+  value: 'aslahea'
+- name: imageRepoFrontend
+  value: 'focus-flow-frontend'
+- name: imageRepoBackend
+  value: 'focus-flow-backend'
+- name: imageRepoTaskRead
+  value: 'focus-flow-task-read'
+- name: imageRepoTaskWrite
+  value: 'focus-flow-task-write'
+
+pool:
+  name: 'FocusFlowPool' # Your Ubuntu Self-Hosted Agent
+
+stages:
+
+# -----------------------------------------------------------
+# STAGE 1: Build & Lint
+# -----------------------------------------------------------
+- stage: Build
+  displayName: 'Lint & Validate'
+  jobs:
+  - job: Validate
+    steps:
+    - checkout: self
+    - bash: helm lint helm/focus-flow
+      displayName: 'Verify Helm Charts'
+
+# -----------------------------------------------------------
+# STAGE 2: Docker Build & Push (All 4 Services)
+# -----------------------------------------------------------
+- stage: Docker
+  displayName: 'Build & Push'
+  dependsOn: Build
+  jobs:
+  - job: PushImages
+    steps:
+    - bash: echo $(DOCKERHUB_PASSWORD) | docker login -u $(dockerHubUsername) --password-stdin
+      displayName: 'Login to Docker Hub'
+
+    - bash: |
+        # Build and Push each service using the dynamic tag
+        docker build -t $(dockerHubUsername)/$(imageRepoFrontend):$(tag) ./frontend
+        docker push $(dockerHubUsername)/$(imageRepoFrontend):$(tag)
+
+        docker build -t $(dockerHubUsername)/$(imageRepoBackend):$(tag) ./backend
+        docker push $(dockerHubUsername)/$(imageRepoBackend):$(tag)
+
+        docker build -t $(dockerHubUsername)/$(imageRepoTaskRead):$(tag) ./task-read-service
+        docker push $(dockerHubUsername)/$(imageRepoTaskRead):$(tag)
+
+        docker build -t $(dockerHubUsername)/$(imageRepoTaskWrite):$(tag) ./task-write-service
+        docker push $(dockerHubUsername)/$(imageRepoTaskWrite):$(tag)
+      displayName: 'Microservices: Build and Push'
+
+# -----------------------------------------------------------
+# STAGE 3: Local Deploy (The Minikube Bridge)
+# -----------------------------------------------------------
+- stage: Deploy
+  displayName: 'Deploy to Minikube'
+  dependsOn: Docker
+  jobs:
+  - job: LocalDeploy
+    steps:
+    - bash: |
+        # Use the local agent's kubeconfig to talk to Minikube
+        export KUBECONFIG=$HOME/.kube/config
+        
+        echo "Starting Helm Upgrade for Focus-Flow Version $(tag)..."
+        
+        helm upgrade --install focus-flow helm/focus-flow \
+          --namespace focus-flow \
+          --create-namespace \
+          --set frontend.image.tag=$(tag) \
+          --set backend.image.tag=$(tag) \
+          --set taskRead.image.tag=$(tag) \
+          --set taskWrite.image.tag=$(tag) \
+          --wait
+      displayName: 'Deploy via Local Helm'
