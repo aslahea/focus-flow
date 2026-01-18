@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: task-read
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: task-read
+  template:
+    metadata:
+      labels:
+        app: task-read
+    spec:
+      containers:
+      - name: task-read
+        image: "{{ .Values.taskRead.image }}:{{ .Values.taskRead.tag }}"
+        ports:
+        - containerPort: {{ .Values.taskRead.port }}
+        env:
+        - name: TASK_WRITE_URL
+          value: "http://task-write:3002"
+        {{- with .Values.taskRead.livenessProbe }}
+        livenessProbe:
+          {{- toYaml . | nindent 8 }}
+        {{- else }}
+        livenessProbe:
+          tcpSocket:
+            port: {{ .Values.taskRead.port }}
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 2
+        {{- end }}
+        {{- with .Values.taskRead.readinessProbe }}
+        readinessProbe:
+          {{- toYaml . | nindent 8 }}
+        {{- else }}
+        readinessProbe:
+          tcpSocket:
+            port: {{ .Values.taskRead.port }}
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 2
+        {{- end }}
+        {{- with .Values.taskRead.resources }}
+        resources:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}

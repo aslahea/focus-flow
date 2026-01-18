@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: task-write
+spec:
+  selector:
+    app: task-write
+  ports:
+  - port: 3002
+    targetPort: 3002

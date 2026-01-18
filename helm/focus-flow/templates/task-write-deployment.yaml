@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: task-write
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: task-write
+  template:
+    metadata:
+      labels:
+        app: task-write
+    spec:
+      containers:
+      - name: task-write
+        image: "{{ .Values.taskWrite.image }}:{{ .Values.taskWrite.tag }}"
+        ports:
+        - containerPort: {{ .Values.taskWrite.port }}
+        {{- with .Values.taskWrite.livenessProbe }}
+        livenessProbe:
+          {{- toYaml . | nindent 8 }}
+        {{- else }}
+        livenessProbe:
+          tcpSocket:
+            port: {{ .Values.taskWrite.port }}
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 2
+        {{- end }}
+        {{- with .Values.taskWrite.readinessProbe }}
+        readinessProbe:
+          {{- toYaml . | nindent 8 }}
+        {{- else }}
+        readinessProbe:
+          tcpSocket:
+            port: {{ .Values.taskWrite.port }}
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 2
+        {{- end }}
+        {{- with .Values.taskWrite.resources }}
+        resources:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        {{- if .Values.taskWrite.persistence.enabled }}
+        volumeMounts:
+          - name: task-write-storage
+            mountPath: /app/db
+        {{- end }}
+      {{- if .Values.taskWrite.persistence.enabled }}
+      volumes:
+        - name: task-write-storage
+          persistentVolumeClaim:
+            claimName: task-write-pvc
+      {{- end }}
