@@ -89,19 +89,15 @@ stages:
     - bash: |
         export KUBECONFIG=$HOME/.kube/config
         
-        echo "Starting Helm Upgrade for Focus-Flow Build $(tag)..."
+        echo "Deploying build $(tag)..."
         
-        # We match your FLAT values.yaml structure exactly
         helm upgrade --install focus-flow helm/focus-flow \
           --namespace focus-flow \
           --create-namespace \
-          --set frontend.image=$(dockerHubUsername)/$(imageRepoFrontend) \
-          --set frontend.tag=$(tag) \
-          --set backend.image=$(dockerHubUsername)/$(imageRepoBackend) \
-          --set backend.tag=$(tag) \
-          --set taskRead.image=$(dockerHubUsername)/$(imageRepoTaskRead) \
-          --set taskRead.tag=$(tag) \
-          --set taskWrite.image=$(dockerHubUsername)/$(imageRepoTaskWrite) \
-          --set taskWrite.tag=$(tag) \
-          --wait --timeout 5m
-      displayName: 'Final Helm Deploy'
+          --set frontend.image.tag=$(tag) \
+          --set backend.image.tag=$(tag) \
+          --set taskRead.image.tag=$(tag) \
+          --set taskWrite.image.tag=$(tag) \
+          --wait \
+          --timeout 5m
+      displayName: 'Helm Deploy (Image Tag Override)'
