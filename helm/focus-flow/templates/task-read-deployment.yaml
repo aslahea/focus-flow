@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
       - name: task-read
-        image: "{{ .Values.taskRead.image }}:{{ .Values.taskRead.tag }}"
+        image: "{{ .Values.taskRead.image.repository }}:{{ .Values.taskRead.image.tag }}"
         ports:
         - containerPort: {{ .Values.taskRead.port }}
         env:
