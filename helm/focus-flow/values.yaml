@@ -1,29 +1,18 @@
 namespace: focus-flow
 
-# Chart-level service defaults used by networking templates
 service:
   port: 3000
 
-# Ingress configuration (disabled by default; enable explicitly)
 ingress:
   enabled: false
-  className: ""
-  annotations: {}
-  tls: []
-  hosts: []
 
-# Gateway API HTTPRoute configuration (disabled by default; enable explicitly)
 httpRoute:
   enabled: false
-  parentRefs: []
-  hostnames: []
-  annotations: {}
-  rules: []
 
 frontend:
   image:
     repository: aslahea/focus-flow-frontend
-    tag: "latest"   # overridden by CI/CD
+    tag: "latest"
   port: 3000
   resources:
     requests:
@@ -36,7 +25,7 @@ frontend:
 backend:
   image:
     repository: aslahea/focus-flow-backend
-    tag: "latest"   # overridden by CI/CD
+    tag: "latest"
   port: 5000
   autoscaling:
     enabled: true
@@ -50,13 +39,12 @@ backend:
     limits:
       cpu: "500m"
       memory: "256Mi"
-  # Optional: explicit frontend origin the backend should allow
   frontendOrigin: "http://localhost:3000"
 
 taskRead:
   image:
     repository: aslahea/focus-flow-task-read
-    tag: "latest"   # overridden by CI/CD
+    tag: "latest"
   port: 3001
   resources:
     requests:
@@ -69,11 +57,10 @@ taskRead:
 taskWrite:
   image:
     repository: aslahea/focus-flow-task-write
-    tag: "latest"   # overridden by CI/CD
+    tag: "latest"
   port: 3002
   persistence:
     enabled: true
-    storageClass: ""
     accessMode: ReadWriteOnce
     size: 1Gi
   resources:
@@ -86,6 +73,3 @@ taskWrite:
 
 serviceAccount:
   create: false
-  name: ""
-  automount: false
-  annotations: {}
