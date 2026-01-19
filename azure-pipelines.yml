@@ -82,18 +82,13 @@ stages:
         
         # 2. FIXED: Explicitly set repository AND tag to avoid 'table' warnings
         # Added --cleanup-on-fail and --timeout to prevent hanging
+        sed -i 's/tag: "1.0"/tag: "$(tag)"/g' helm/focus-flow/values.yaml
+        
+        echo "Modified values.yaml with new tag: $(tag)"
+        
+        # Now deploy without --set flags for tags
         helm upgrade --install focus-flow helm/focus-flow \
           --namespace focus-flow \
           --create-namespace \
-          --set frontend.image.repository=$(dockerHubUsername)/$(imageRepoFrontend) \
-          --set frontend.image.tag=$(tag) \
-          --set backend.image.repository=$(dockerHubUsername)/$(imageRepoBackend) \
-          --set backend.image.tag=$(tag) \
-          --set taskRead.image.repository=$(dockerHubUsername)/$(imageRepoTaskRead) \
-          --set taskRead.image.tag=$(tag) \
-          --set taskWrite.image.repository=$(dockerHubUsername)/$(imageRepoTaskWrite) \
-          --set taskWrite.image.tag=$(tag) \
-          --cleanup-on-fail \
-          --timeout 300s \
           --wait
-      displayName: 'Helm Deploy (Fixed Image Paths)'
+      displayName: 'Deploy via sed replacement'
