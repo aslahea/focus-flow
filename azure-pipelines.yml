@@ -17,12 +17,12 @@ variables:
   value: focus-flow-task-write
 
 pool:
-  name: 'FocusFlowPool' # Ensure this matches your agent pool name
+  name: 'FocusFlowPool' 
 
 stages:
 
 # -----------------------------------------------------------
-# STAGE 1: Build & Validate
+# STAGE 1: Build & Validate (Linting)
 # -----------------------------------------------------------
 - stage: Build
   displayName: 'Lint & Validate'
@@ -36,7 +36,7 @@ stages:
       displayName: 'Helm Lint Check'
 
 # -----------------------------------------------------------
-# STAGE 2: Docker Build & Push
+# STAGE 2: Docker Build & Push (Includes Artifacts Auth)
 # -----------------------------------------------------------
 - stage: Docker
   displayName: 'Docker Build & Push'
@@ -45,27 +45,39 @@ stages:
   jobs:
   - job: BuildImages
     steps:
+    - checkout: self
+
+    # NEW: Authenticate with Azure Artifacts NPM Feed
+    # This allows 'npm install' to work inside your Docker builds if you use private packages
+    - task: npmAuthenticate@0
+      displayName: 'Authenticate with Azure Artifacts'
+      inputs:
+        workingFile: .npmrc # Ensure you have an .npmrc file in your project root
+
     - bash: |
         echo $(DOCKERHUB_PASSWORD) | docker login -u $(dockerHubUsername) --password-stdin
       displayName: 'Docker Hub Login'
 
     - bash: |
-        # Build and Push All 4 Services
+        # Frontend
         docker build -t $(dockerHubUsername)/$(imageRepoFrontend):$(tag) ./frontend
         docker push $(dockerHubUsername)/$(imageRepoFrontend):$(tag)
 
+        # Backend (Gateway)
         docker build -t $(dockerHubUsername)/$(imageRepoBackend):$(tag) ./backend
         docker push $(dockerHubUsername)/$(imageRepoBackend):$(tag)
 
+        # Task Read
         docker build -t $(dockerHubUsername)/$(imageRepoTaskRead):$(tag) ./backend/task-read-service
         docker push $(dockerHubUsername)/$(imageRepoTaskRead):$(tag)
 
+        # Task Write (STATEFUL)
         docker build -t $(dockerHubUsername)/$(imageRepoTaskWrite):$(tag) ./backend/task-write-service
         docker push $(dockerHubUsername)/$(imageRepoTaskWrite):$(tag)
-      displayName: 'Build & Push Microservices'
+      displayName: 'Build & Push All Microservices'
 
 # -----------------------------------------------------------
-# STAGE 3: Deploy to Local Minikube (FIXED)
+# STAGE 3: Deploy to Local Minikube (Corrected Schema)
 # -----------------------------------------------------------
 - stage: Deploy
   displayName: 'Deploy to Minikube'
@@ -77,15 +89,19 @@ stages:
     - bash: |
         export KUBECONFIG=$HOME/.kube/config
         
-        echo "Deploying build $(tag)..."
+        echo "Starting Helm Upgrade for Focus-Flow Build $(tag)..."
         
+        # We match your FLAT values.yaml structure exactly
         helm upgrade --install focus-flow helm/focus-flow \
           --namespace focus-flow \
           --create-namespace \
-          --set frontend.image.tag=$(tag) \
-          --set backend.image.tag=$(tag) \
-          --set taskRead.image.tag=$(tag) \
-          --set taskWrite.image.tag=$(tag) \
-          --wait \
-          --timeout 5m
-      displayName: 'Helm Deploy (Image Tag Override)'
+          --set frontend.image=$(dockerHubUsername)/$(imageRepoFrontend) \
+          --set frontend.tag=$(tag) \
+          --set backend.image=$(dockerHubUsername)/$(imageRepoBackend) \
+          --set backend.tag=$(tag) \
+          --set taskRead.image=$(dockerHubUsername)/$(imageRepoTaskRead) \
+          --set taskRead.tag=$(tag) \
+          --set taskWrite.image=$(dockerHubUsername)/$(imageRepoTaskWrite) \
+          --set taskWrite.tag=$(tag) \
+          --wait --timeout 5m
+      displayName: 'Final Helm Deploy'
