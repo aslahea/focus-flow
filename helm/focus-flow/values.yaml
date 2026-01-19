@@ -21,8 +21,9 @@ httpRoute:
   rules: []
 
 frontend:
-  image: aslahea/focus-flow-frontend
-  tag: "1.0"
+  image:
+    repository: aslahea/focus-flow-frontend
+    tag: "latest"   # overridden by CI/CD
   port: 3000
   resources:
     requests:
@@ -33,10 +34,10 @@ frontend:
       memory: "256Mi"
 
 backend:
-  image: aslahea/focus-flow-backend
-  tag: "1.0"
+  image:
+    repository: aslahea/focus-flow-backend
+    tag: "latest"   # overridden by CI/CD
   port: 5000
-  # Backend autoscaling and resources (production-ready defaults)
   autoscaling:
     enabled: true
     minReplicas: 1
@@ -49,13 +50,13 @@ backend:
     limits:
       cpu: "500m"
       memory: "256Mi"
-  # Optional: explicit frontend origin the backend should allow (set to your frontend URL)
-  # Example: "http://localhost:3000" or "http://192.168.58.2:32688"
+  # Optional: explicit frontend origin the backend should allow
   frontendOrigin: "http://localhost:3000"
 
 taskRead:
-  image: aslahea/focus-flow-task-read
-  tag: "1.0"
+  image:
+    repository: aslahea/focus-flow-task-read
+    tag: "latest"   # overridden by CI/CD
   port: 3001
   resources:
     requests:
@@ -66,10 +67,10 @@ taskRead:
       memory: "128Mi"
 
 taskWrite:
-  image: aslahea/focus-flow-task-write
-  tag: "1.0"
+  image:
+    repository: aslahea/focus-flow-task-write
+    tag: "latest"   # overridden by CI/CD
   port: 3002
-  # Persistence for task-write service (production required)
   persistence:
     enabled: true
     storageClass: ""
