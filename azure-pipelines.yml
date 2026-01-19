@@ -2,27 +2,27 @@ trigger:
   - main
 
 variables:
-- group: dockerhub-secrets  # <--- Make sure you created this in Library!
+- group: dockerhub-secrets
 - name: tag
-  value: '$(Build.BuildId)' # Dynamic tagging for production
+  value: $(Build.BuildId)
 - name: dockerHubUsername
-  value: 'aslahea'
+  value: aslahea
 - name: imageRepoFrontend
-  value: 'focus-flow-frontend'
+  value: focus-flow-frontend
 - name: imageRepoBackend
-  value: 'focus-flow-backend'
+  value: focus-flow-backend
 - name: imageRepoTaskRead
-  value: 'focus-flow-task-read'
+  value: focus-flow-task-read
 - name: imageRepoTaskWrite
-  value: 'focus-flow-task-write'
+  value: focus-flow-task-write
 
 pool:
-  name: 'FocusFlowPool' # Your Ubuntu Self-Hosted Agent
+  name: 'FocusFlowPool' # Ensure this matches your agent pool name
 
 stages:
 
 # -----------------------------------------------------------
-# STAGE 1: Build & Lint
+# STAGE 1: Build & Validate
 # -----------------------------------------------------------
 - stage: Build
   displayName: 'Lint & Validate'
@@ -30,23 +30,27 @@ stages:
   - job: Validate
     steps:
     - checkout: self
-    - bash: helm lint helm/focus-flow
-      displayName: 'Verify Helm Charts'
+    - bash: |
+        echo "Running Helm lint..."
+        helm lint helm/focus-flow
+      displayName: 'Helm Lint Check'
 
 # -----------------------------------------------------------
-# STAGE 2: Docker Build & Push (All 4 Services)
+# STAGE 2: Docker Build & Push
 # -----------------------------------------------------------
 - stage: Docker
-  displayName: 'Build & Push'
+  displayName: 'Docker Build & Push'
   dependsOn: Build
+  condition: succeeded()
   jobs:
-  - job: PushImages
+  - job: BuildImages
     steps:
-    - bash: echo $(DOCKERHUB_PASSWORD) | docker login -u $(dockerHubUsername) --password-stdin
-      displayName: 'Login to Docker Hub'
+    - bash: |
+        echo $(DOCKERHUB_PASSWORD) | docker login -u $(dockerHubUsername) --password-stdin
+      displayName: 'Docker Hub Login'
 
     - bash: |
-        # Build and Push each service using the dynamic tag
+        # Build and Push All 4 Services
         docker build -t $(dockerHubUsername)/$(imageRepoFrontend):$(tag) ./frontend
         docker push $(dockerHubUsername)/$(imageRepoFrontend):$(tag)
 
@@ -58,29 +62,38 @@ stages:
 
         docker build -t $(dockerHubUsername)/$(imageRepoTaskWrite):$(tag) ./backend/task-write-service
         docker push $(dockerHubUsername)/$(imageRepoTaskWrite):$(tag)
-      displayName: 'Microservices: Build and Push'
+      displayName: 'Build & Push Microservices'
 
 # -----------------------------------------------------------
-# STAGE 3: Local Deploy (The Minikube Bridge)
+# STAGE 3: Deploy to Local Minikube (FIXED)
 # -----------------------------------------------------------
 - stage: Deploy
   displayName: 'Deploy to Minikube'
   dependsOn: Docker
+  condition: succeeded()
   jobs:
   - job: LocalDeploy
     steps:
     - bash: |
-        # Use the local agent's kubeconfig to talk to Minikube
+        # 1. Point to the local cluster config
         export KUBECONFIG=$HOME/.kube/config
         
-        echo "Starting Helm Upgrade for Focus-Flow Version $(tag)..."
+        echo "Starting deployment for build $(tag)..."
         
+        # 2. FIXED: Explicitly set repository AND tag to avoid 'table' warnings
+        # Added --cleanup-on-fail and --timeout to prevent hanging
         helm upgrade --install focus-flow helm/focus-flow \
           --namespace focus-flow \
           --create-namespace \
+          --set frontend.image.repository=$(dockerHubUsername)/$(imageRepoFrontend) \
           --set frontend.image.tag=$(tag) \
+          --set backend.image.repository=$(dockerHubUsername)/$(imageRepoBackend) \
           --set backend.image.tag=$(tag) \
+          --set taskRead.image.repository=$(dockerHubUsername)/$(imageRepoTaskRead) \
           --set taskRead.image.tag=$(tag) \
+          --set taskWrite.image.repository=$(dockerHubUsername)/$(imageRepoTaskWrite) \
           --set taskWrite.image.tag=$(tag) \
+          --cleanup-on-fail \
+          --timeout 300s \
           --wait
-      displayName: 'Deploy via Local Helm'
+      displayName: 'Helm Deploy (Fixed Image Paths)'
