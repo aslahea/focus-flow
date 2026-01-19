@@ -75,20 +75,17 @@ stages:
   - job: LocalDeploy
     steps:
     - bash: |
-        # 1. Point to the local cluster config
         export KUBECONFIG=$HOME/.kube/config
         
-        echo "Starting deployment for build $(tag)..."
+        echo "Deploying build $(tag)..."
         
-        # 2. FIXED: Explicitly set repository AND tag to avoid 'table' warnings
-        # Added --cleanup-on-fail and --timeout to prevent hanging
-        sed -i 's/tag: "1.0"/tag: "$(tag)"/g' helm/focus-flow/values.yaml
-        
-        echo "Modified values.yaml with new tag: $(tag)"
-        
-        # Now deploy without --set flags for tags
         helm upgrade --install focus-flow helm/focus-flow \
           --namespace focus-flow \
           --create-namespace \
-          --wait
-      displayName: 'Deploy via sed replacement'
+          --set frontend.image.tag=$(tag) \
+          --set backend.image.tag=$(tag) \
+          --set taskRead.image.tag=$(tag) \
+          --set taskWrite.image.tag=$(tag) \
+          --wait \
+          --timeout 5m
+      displayName: 'Helm Deploy (Image Tag Override)'
