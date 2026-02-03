@@ -1,16 +1,24 @@
-name: Test Self Hosted Runner
+name: Focus-Flow CI/CD
 
-on: [push]
+on:
+  push:
+    branches:
+      - main
 
 jobs:
-  test:
-    runs-on: [self-hosted, linux]
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+  ci:
+    uses: ./.github/workflows/ci-template.yml
 
-      - name: Test runner
-        run: |
-          echo "Runner is working"
-          uname -a
-          whoami
+  docker:
+    needs: ci
+    uses: ./.github/workflows/docker-template.yml
+    with:
+      tag: ${{ github.run_number }}
+    secrets: inherit
+
+  deploy:
+    needs: docker
+    uses: ./.github/workflows/deploy-template.yml
+    with:
+      tag: ${{ github.run_number }}
+    secrets: inherit
