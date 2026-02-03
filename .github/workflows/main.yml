@@ -5,6 +5,18 @@ on:
     branches:
       - main
 
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Select deployment environment"
+        required: true
+        default: "dev"
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+
 jobs:
   ci:
     uses: ./.github/workflows/ci-template.yml
@@ -21,4 +33,5 @@ jobs:
     uses: ./.github/workflows/deploy-template.yml
     with:
       tag: ${{ github.run_number }}
+      environment: ${{ github.event.inputs.environment || 'dev' }}
     secrets: inherit
