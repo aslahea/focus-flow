@@ -1,1 +1,47 @@
-# docker build & push
+name: Docker Build & Push
+
+on:
+  workflow_call:
+    inputs:
+      tag:
+        required: true
+        type: string
+    secrets:
+      DOCKERHUB_USERNAME:
+        required: true
+      DOCKERHUB_PASSWORD:
+        required: true
+
+jobs:
+  docker:
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Docker Login
+        run: |
+          echo "${{ secrets.DOCKERHUB_PASSWORD }}" | \
+          docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
+
+      - name: Build & Push All Microservices
+        run: |
+          TAG=${{ inputs.tag }}
+          USER=${{ secrets.DOCKERHUB_USERNAME }}
+
+          # Frontend
+          docker build -t $USER/focus-flow-frontend:$TAG ./frontend
+          docker push $USER/focus-flow-frontend:$TAG
+
+          # Backend
+          docker build -t $USER/focus-flow-backend:$TAG ./backend
+          docker push $USER/focus-flow-backend:$TAG
+
+          # Task Read
+          docker build -t $USER/focus-flow-task-read:$TAG ./backend/task-read-service
+          docker push $USER/focus-flow-task-read:$TAG
+
+          # Task Write
+          docker build -t $USER/focus-flow-task-write:$TAG ./backend/task-write-service
+          docker push $USER/focus-flow-task-write:$TAG
