@@ -1,1 +1,17 @@
-# will start 
+name: CI - Helm Lint
+
+on:
+  workflow_call:
+
+jobs:
+  helm-lint:
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Helm Lint
+        run: |
+          echo "Running Helm lint..."
+          helm lint helm/focus-flow
