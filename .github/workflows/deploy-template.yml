@@ -1,1 +1,38 @@
-# helm deploy
+name: Helm Deploy
+
+on:
+  workflow_call:
+    inputs:
+      tag:
+        required: true
+        type: string
+    secrets:
+      KUBECONFIG:
+        required: true
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure kubeconfig
+        run: |
+          echo "${{ secrets.KUBECONFIG }}" | base64 -d > kubeconfig
+          export KUBECONFIG=$PWD/kubeconfig
+
+      - name: Helm Deploy
+        run: |
+          TAG=${{ inputs.tag }}
+
+          helm upgrade --install focus-flow helm/focus-flow \
+            --namespace focus-flow \
+            --create-namespace \
+            --set frontend.image.tag=$TAG \
+            --set backend.image.tag=$TAG \
+            --set taskRead.image.tag=$TAG \
+            --set taskWrite.image.tag=$TAG \
+            --wait \
+            --timeout 5m
