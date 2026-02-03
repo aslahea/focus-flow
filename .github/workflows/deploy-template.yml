@@ -6,6 +6,9 @@ on:
       tag:
         required: true
         type: string
+      environment:
+        required: true
+        type: string
     secrets:
       KUBECONFIG:
         required: true
@@ -13,6 +16,8 @@ on:
 jobs:
   deploy:
     runs-on: self-hosted
+    environment:
+      name: ${{ inputs.environment }}
 
     steps:
       - name: Checkout code
@@ -26,6 +31,9 @@ jobs:
       - name: Helm Deploy
         run: |
           TAG=${{ inputs.tag }}
+          ENV=${{ inputs.environment }}
+
+          echo "Deploying to environment: $ENV"
 
           helm upgrade --install focus-flow helm/focus-flow \
             --namespace focus-flow \
