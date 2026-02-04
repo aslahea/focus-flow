@@ -1,10 +1,22 @@
-name: CI - Helm Lint
+name: CI - Helm Lint + SonarQube
 
 on:
   workflow_call:
+    inputs:
+      service_name:
+        required: true
+        type: string
+      service_path:
+        required: true
+        type: string
+    secrets:
+      SONAR_TOKEN:
+        required: true
+      SONAR_HOST_URL:
+        required: true
 
 jobs:
-  helm-lint:
+  ci:
     runs-on: self-hosted
 
     steps:
@@ -13,5 +25,14 @@ jobs:
 
       - name: Helm Lint
         run: |
-          echo "Running Helm lint..."
           helm lint helm/focus-flow
+
+      - name: SonarQube Scan
+        uses: SonarSource/sonarqube-scan-action@v6
+        with:
+          args: >
+            -Dsonar.projectKey=${{ inputs.service_name }}
+            -Dsonar.sources=${{ inputs.service_path }}
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
