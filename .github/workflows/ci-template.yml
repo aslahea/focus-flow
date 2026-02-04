@@ -25,7 +25,8 @@ jobs:
 
       - name: Helm Lint
         run: |
-          helm lint helm/focus-flow
+          mkdir -p artifacts
+          helm lint helm/focus-flow | tee artifacts/helm-lint.txt
 
       - name: SonarQube Scan
         uses: SonarSource/sonarqube-scan-action@v6
@@ -36,3 +37,9 @@ jobs:
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+
+      - name: Upload CI Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-artifacts-${{ inputs.service_name }}
+          path: artifacts/
