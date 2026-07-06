@@ -8,7 +8,7 @@ on:
         default: 'javascript'
       target-url:
         type: string
-        default: 'https://example.com'
+        default: 'https://ikigaiedu.online/'
       email-recipient:
         type: string
         required: true
@@ -21,7 +21,7 @@ on:
       target-url:
         description: 'OWASP ZAP Scan Target URL'
         required: true
-        default: 'https://example.com'
+        default: 'https://ikigaiedu.online/'
       email-recipient:
         description: 'Send test email to:'
         required: true
