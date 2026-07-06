@@ -28,13 +28,12 @@ on:
         default: 'aslahea068@gmail.com'
 
 jobs:
-  # 1. CodeQL SAST Scan (Enabled licensing protection with continue-on-error)
+  # 1. CodeQL SAST Scan (Job-level continue-on-error removed for schema compliance)
   sast-codeql:
     permissions:
       security-events: write
       actions: read
       contents: read
-    continue-on-error: true
     uses: aslahea/zero-friction-devsecops/.github/workflows/codeql.yml@main
     with:
       language: ${{ github.event.inputs.language || inputs.language }}
@@ -74,16 +73,21 @@ jobs:
 
       # Send Email ONLY if SMTP credentials exist in the executing repository
       - name: Send Email Report
-        if: "${{ secrets.MAIL_SERVER != '' }}"
+        env:
+          MAIL_SERVER: ${{ secrets.MAIL_SERVER }}
+          MAIL_PORT: ${{ secrets.MAIL_PORT }}
+          MAIL_USERNAME: ${{ secrets.MAIL_USERNAME }}
+          MAIL_PASSWORD: ${{ secrets.MAIL_PASSWORD }}
+        if: ${{ env.MAIL_SERVER != '' }}
         uses: dawidd6/action-send-mail@v4
         with:
-          server_address: ${{ secrets.MAIL_SERVER }}
-          server_port: ${{ secrets.MAIL_PORT }}
-          username: ${{ secrets.MAIL_USERNAME }}
-          password: ${{ secrets.MAIL_PASSWORD }}
+          server_address: ${{ env.MAIL_SERVER }}
+          server_port: ${{ env.MAIL_PORT }}
+          username: ${{ env.MAIL_USERNAME }}
+          password: ${{ env.MAIL_PASSWORD }}
           subject: "[DevSecOps Alert] Pipeline Security Reports for ${{ github.repository }}"
           to: ${{ github.event.inputs.email-recipient || inputs.email-recipient }}
-          from: "DevSecOps Engine <${{ secrets.MAIL_USERNAME }}>"
+          from: "DevSecOps Engine <${{ env.MAIL_USERNAME }}>"
           body: |
             Hello Team,
 
@@ -102,7 +106,9 @@ jobs:
 
       # Fallback notice if SMTP secrets are missing in the app repo
       - name: Log Notice (SMTP Not Configured in Caller Repository)
-        if: "${{ secrets.MAIL_SERVER == '' }}"
+        env:
+          MAIL_SERVER: ${{ secrets.MAIL_SERVER }}
+        if: ${{ env.MAIL_SERVER == '' }}
         run: |
           echo "========================================================="
           echo "   SMTP credentials not configured in this repository.   "
