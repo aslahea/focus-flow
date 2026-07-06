@@ -72,6 +72,7 @@ jobs:
           path: reports/
 
       - name: Send Email Report
+        if: "${{ secrets.MAIL_SERVER != '' }}"
         uses: dawidd6/action-send-mail@v4
         with:
           server_address: ${{ secrets.MAIL_SERVER }}
@@ -95,6 +96,5 @@ jobs:
 
             Regards,
             DevSecOps Governance Engine
-          attachments: |
-            reports/trivy-report.txt
-            reports/zap_report.html
+          # Using a single-line wildcard grabs BOTH files automatically and prevents parsing issues
+          attachments: reports/*
