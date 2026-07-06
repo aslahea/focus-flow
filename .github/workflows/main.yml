@@ -76,22 +76,20 @@ jobs:
           name: zap-report
           path: reports/
 
-      # Dynamic HTML & Text Generator: Fetches metrics and generates a styled HTML page
-      - name: Generate SonarQube Reports
+      # Dynamic API Call: Generates a custom SonarQube text report on-the-fly
+      - name: Generate SonarQube Text Report
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           PROJECT_KEY: ${{ secrets.SONAR_ORGANIZATION || github.repository_owner }}_${{ github.event.repository.name }}
         if: ${{ env.SONAR_TOKEN != '' }}
         run: |
           echo "Polling SonarCloud API for final analysis..."
-          sleep 10 # Buffer to allow SonarCloud to finish processing
+          sleep 10 # Short buffer to allow SonarCloud to finish processing
           
           curl -s -u "${SONAR_TOKEN}:" "https://sonarcloud.io/api/qualitygates/project_status?projectKey=${PROJECT_KEY}" > sonar-raw.json
           
           if jq -e .projectStatus sonar-raw.json >/dev/null; then
             STATUS=$(jq -r '.projectStatus.status' sonar-raw.json)
-            
-            # 1. Generate text report
             echo "=========================================" > reports/sonar-report.txt
             echo "      SONARCLOUD QUALITY GATE REPORT     " >> reports/sonar-report.txt
             echo "=========================================" >> reports/sonar-report.txt
@@ -102,80 +100,11 @@ jobs:
             jq -r '.projectStatus.conditions[] | "Metric: \(.metricKey) | Status: \(.status) | Value: \(.actualValue) (Threshold: \(.errorThreshold || "N/A"))"' sonar-raw.json >> reports/sonar-report.txt
             echo "=========================================" >> reports/sonar-report.txt
             echo "View Full Dashboard: https://sonarcloud.io/dashboard?id=${PROJECT_KEY}" >> reports/sonar-report.txt
-
-            # 2. Generate custom, styled HTML report
-            cat <<EOF > reports/sonar_report.html
-            <!DOCTYPE html>
-            <html>
-            <head>
-              <title>SonarCloud Quality Gate Report</title>
-              <style>
-                body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 30px; background-color: #f8fafc; color: #1e293b; }
-                .container { max-width: 800px; margin: auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
-                h1 { text-align: center; color: #0f172a; border-bottom: 2px solid #f1f5f9; padding-bottom: 20px; margin-top: 0; }
-                .meta { display: flex; justify-content: space-between; align-items: center; background: #f8fafc; padding: 15px 20px; border-radius: 6px; margin-bottom: 25px; }
-                .meta p { margin: 5px 0; }
-                .status-box { display: inline-block; padding: 6px 14px; font-weight: bold; border-radius: 4px; color: white; }
-                .status-OK { background-color: #22c55e; }
-                .status-ERROR { background-color: #ef4444; }
-                table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-                th, td { padding: 12px 16px; text-align: left; border-bottom: 1px solid #f1f5f9; }
-                th { background-color: #f1f5f9; color: #475569; font-weight: bold; }
-                tr:hover { background-color: #fafbfd; }
-                .metric-name { font-weight: bold; color: #334155; }
-                .badge { padding: 4px 8px; border-radius: 12px; font-size: 11px; font-weight: bold; text-transform: uppercase; }
-                .badge-OK { background-color: #dcfce7; color: #166534; }
-                .badge-ERROR { background-color: #fee2e2; color: #991b1b; }
-                .footer { margin-top: 35px; text-align: center; font-size: 13px; color: #64748b; border-top: 1px solid #f1f5f9; padding-top: 20px; }
-                .btn { display: inline-block; margin-top: 15px; padding: 10px 24px; background-color: #2563eb; color: white; text-decoration: none; border-radius: 6px; font-weight: bold; }
-                .btn:hover { background-color: #1d4ed8; }
-              </style>
-            </head>
-            <body>
-              <div class="container">
-                <h1>SonarCloud Quality Gate Report</h1>
-                <div class="meta">
-                  <div>
-                    <p><strong>Project Key:</strong> ${PROJECT_KEY}</p>
-                    <p><strong>Scan Type:</strong> Code Quality & Quality Gate (SAST)</p>
-                  </div>
-                  <div>
-                    <span class="status-box status-${STATUS}">GATE: ${STATUS}</span>
-                  </div>
-                </div>
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Metric Evaluated</th>
-                      <th>Status</th>
-                      <th>Actual Value</th>
-                      <th>Error Threshold</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-            EOF
-
-            # Use jq to write the HTML table rows dynamically
-            jq -r '.projectStatus.conditions[] | "<tr><td class=\"metric-name\">\(.metricKey)</td><td><span class=\"badge badge-\(.status)\">\(.status)</span></td><td>\(.actualValue)</td><td>\(.errorThreshold // "N/A")</td></tr>"' sonar-raw.json >> reports/sonar_report.html
-
-            cat <<EOF >> reports/sonar_report.html
-                  </tbody>
-                </table>
-                <div class="footer">
-                  <p>Generated dynamically by your Central DevSecOps Pipeline.</p>
-                  <a href="https://sonarcloud.io/dashboard?id=${PROJECT_KEY}" class="btn" target="_blank">Go to Live SonarCloud Dashboard</a>
-                </div>
-              </div>
-            </body>
-            </html>
-            EOF
-
           else
             echo "Failed to retrieve SonarCloud metrics. Project may not be analyzed yet." > reports/sonar-report.txt
-            echo "<h1>Failed to retrieve SonarCloud metrics.</h1>" > reports/sonar_report.html
           fi
 
-      # Send Email Report (Packages all files inside the reports directory)
+      # Send Email Report (including our new sonar-report.txt)
       - name: Send Email Report
         env:
           MAIL_SERVER: ${{ secrets.MAIL_SERVER }}
@@ -196,7 +125,7 @@ jobs:
 
             Summary of Scans:
             1. SAST (CodeQL): Completed. Findings are visual and available on your GitHub dashboard under "Security > Code scanning".
-            2. SAST (SonarCloud): Quality Gate Analysis completed. (Detailed interactive HTML and text reports are attached).
+            2. SAST (SonarCloud): Quality Gate Analysis completed. Detailed metrics are attached as 'sonar-report.txt'.
             3. SCA (Trivy): Completed. (Trivy text report is attached).
             4. DAST (OWASP ZAP): Completed. (ZAP HTML report is attached).
 
