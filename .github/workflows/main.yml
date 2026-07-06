@@ -38,7 +38,7 @@ jobs:
     with:
       language: ${{ github.event.inputs.language || inputs.language }}
 
-  # 2. SonarCloud Code Quality Scan (Completely Automated & Multi-Tenant Friendly)
+  # 2. SonarCloud Code Quality Scan
   sast-sonar:
     uses: aslahea/zero-friction-devsecops/.github/workflows/sonarqube.yml@main
     secrets: inherit
@@ -76,7 +76,7 @@ jobs:
           name: zap-report
           path: reports/
 
-      # Dynamic HTML & Text Generator: Fetches metrics and generates styled files
+      # Dynamic HTML & Text Generator: Uses robust inline Python to generate files
       - name: Generate SonarQube Reports
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
@@ -88,92 +88,108 @@ jobs:
           
           curl -s -u "${SONAR_TOKEN}:" "https://sonarcloud.io/api/qualitygates/project_status?projectKey=${PROJECT_KEY}" > sonar-raw.json
           
-          if jq -e .projectStatus sonar-raw.json >/dev/null; then
-            STATUS=$(jq -r '.projectStatus.status' sonar-raw.json)
-            
-            # 1. Generate text report
-            echo "=========================================" > reports/sonar-report.txt
-            echo "      SONARCLOUD QUALITY GATE REPORT     " >> reports/sonar-report.txt
-            echo "=========================================" >> reports/sonar-report.txt
-            echo "Project Key: ${PROJECT_KEY}" >> reports/sonar-report.txt
-            echo "Quality Gate Status: ${STATUS}" >> reports/sonar-report.txt
-            echo "-----------------------------------------" >> reports/sonar-report.txt
-            echo "Detailed Quality Gate Conditions:" >> reports/sonar-report.txt
-            jq -r '.projectStatus.conditions[] | "Metric: \(.metricKey) | Status: \(.status) | Value: \(.actualValue) (Threshold: \(.errorThreshold || \"N/A\"))"' sonar-raw.json >> reports/sonar-report.txt
-            echo "=========================================" >> reports/sonar-report.txt
-            echo "View Full Dashboard: https://sonarcloud.io/dashboard?id=${PROJECT_KEY}" >> reports/sonar-report.txt
+          python3 -c "
+          import json, os
+          try:
+              with open('sonar-raw.json') as f:
+                  data = json.load(f)
+              status = data['projectStatus']['status']
+              project_key = os.environ['PROJECT_KEY']
+              
+              # 1. Generate Text Report
+              with open('reports/sonar-report.txt', 'w') as txt:
+                  txt.write('=========================================\n')
+                  txt.write('      SONARCLOUD QUALITY GATE REPORT     \n')
+                  txt.write('=========================================\n')
+                  txt.write(f'Project Key: {project_key}\n')
+                  txt.write(f'Quality Gate Status: {status}\n')
+                  txt.write('-----------------------------------------\n')
+                  txt.write('Detailed Quality Gate Conditions:\n')
+                  for cond in data['projectStatus']['conditions']:
+                      txt.write(f\"Metric: {cond['metricKey']} | Status: {cond['status']} | Value: {cond['actualValue']} (Threshold: {cond.get('errorThreshold', 'N/A')})\n\")
+                  txt.write('=========================================\n')
+                  txt.write(f'View Full Dashboard: https://sonarcloud.io/dashboard?id={project_key}\n')
 
-            # 2. Generate custom, styled HTML report (EOF is aligned all the way to the left margin)
-            cat <<EOF > reports/sonar_report.html
-            <!DOCTYPE html>
-            <html>
-            <head>
-              <title>SonarCloud Quality Gate Report</title>
-              <style>
-                body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 30px; background-color: #f8fafc; color: #1e293b; }
-                .container { max-width: 800px; margin: auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
-                h1 { text-align: center; color: #0f172a; border-bottom: 2px solid #f1f5f9; padding-bottom: 20px; margin-top: 0; }
-                .meta { display: flex; justify-content: space-between; align-items: center; background: #f8fafc; padding: 15px 20px; border-radius: 6px; margin-bottom: 25px; }
-                .meta p { margin: 5px 0; }
-                .status-box { display: inline-block; padding: 6px 14px; font-weight: bold; border-radius: 4px; color: white; }
-                .status-OK { background-color: #22c55e; }
-                .status-ERROR { background-color: #ef4444; }
-                table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-                th, td { padding: 12px 16px; text-align: left; border-bottom: 1px solid #f1f5f9; }
-                th { background-color: #f1f5f9; color: #475569; font-weight: bold; }
-                tr:hover { background-color: #fafbfd; }
-                .metric-name { font-weight: bold; color: #334155; }
-                .badge { padding: 4px 8px; border-radius: 12px; font-size: 11px; font-weight: bold; text-transform: uppercase; }
-                .badge-OK { background-color: #dcfce7; color: #166534; }
-                .badge-ERROR { background-color: #fee2e2; color: #991b1b; }
-                .footer { margin-top: 35px; text-align: center; font-size: 13px; color: #64748b; border-top: 1px solid #f1f5f9; padding-top: 20px; }
-                .btn { display: inline-block; margin-top: 15px; padding: 10px 24px; background-color: #2563eb; color: white; text-decoration: none; border-radius: 6px; font-weight: bold; }
-                .btn:hover { background-color: #1d4ed8; }
-              </style>
-            </head>
-            <body>
-              <div class="container">
-                <h1>SonarCloud Quality Gate Report</h1>
-                <div class="meta">
-                  <div>
-                    <p><strong>Project Key:</strong> ${PROJECT_KEY}</p>
-                    <p><strong>Scan Type:</strong> Code Quality & Quality Gate (SAST)</p>
+              # 2. Generate Beautiful HTML Report
+              html_content = f'''<!DOCTYPE html>
+              <html>
+              <head>
+                <title>SonarCloud Quality Gate Report</title>
+                <style>
+                  body {{ font-family: \"Segoe UI\", Tahoma, Geneva, Verdana, sans-serif; margin: 30px; background-color: #f8fafc; color: #1e293b; }}
+                  .container {{ max-width: 800px; margin: auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }}
+                  h1 {{ text-align: center; color: #0f172a; border-bottom: 2px solid #f1f5f9; padding-bottom: 20px; margin-top: 0; }}
+                  .meta {{ display: flex; justify-content: space-between; align-items: center; background: #f8fafc; padding: 15px 20px; border-radius: 6px; margin-bottom: 25px; }}
+                  .meta p {{ margin: 5px 0; }}
+                  .status-box {{ display: inline-block; padding: 6px 14px; font-weight: bold; border-radius: 4px; color: white; }}
+                  .status-OK {{ background-color: #22c55e; }}
+                  .status-ERROR {{ background-color: #ef4444; }}
+                  table {{ width: 100%; border-collapse: collapse; margin-top: 10px; }}
+                  th, td {{ padding: 12px 16px; text-align: left; border-bottom: 1px solid #f1f5f9; }}
+                  th {{ background-color: #f1f5f9; color: #475569; font-weight: bold; }}
+                  tr:hover {{ background-color: #fafbfd; }}
+                  .metric-name {{ font-weight: bold; color: #334155; }}
+                  .badge {{ padding: 4px 8px; border-radius: 12px; font-size: 11px; font-weight: bold; text-transform: uppercase; }}
+                  .badge-OK {{ background-color: #dcfce7; color: #166534; }}
+                  .badge-ERROR {{ background-color: #fee2e2; color: #991b1b; }}
+                  .footer {{ margin-top: 35px; text-align: center; font-size: 13px; color: #64748b; border-top: 1px solid #f1f5f9; padding-top: 20px; }}
+                  .btn {{ display: inline-block; margin-top: 15px; padding: 10px 24px; background-color: #2563eb; color: white; text-decoration: none; border-radius: 6px; font-weight: bold; }}
+                  .btn:hover {{ background-color: #1d4ed8; }}
+                </style>
+              </head>
+              <body>
+                <div class=\"container\">
+                  <h1>SonarCloud Quality Gate Report</h1>
+                  <div class=\"meta\">
+                    <div>
+                      <p><strong>Project Key:</strong> {project_key}</p>
+                      <p><strong>Scan Type:</strong> Code Quality & Quality Gate (SAST)</p>
+                    </div>
+                    <div>
+                      <span class=\"status-box status-{status}\">GATE: {status}</span>
+                    </div>
                   </div>
-                  <div>
-                    <span class="status-box status-${STATUS}">GATE: ${STATUS}</span>
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Metric Evaluated</th>
+                        <th>Status</th>
+                        <th>Actual Value</th>
+                        <th>Error Threshold</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+              '''
+              for cond in data['projectStatus']['conditions']:
+                  html_content += f'''
+                      <tr>
+                        <td class=\"metric-name\">{cond['metricKey']}</td>
+                        <td><span class=\"badge badge-{cond['status']}\">{cond['status']}</span></td>
+                        <td>{cond['actualValue']}</td>
+                        <td>{cond.get('errorThreshold', 'N/A')}</td>
+                      </tr>
+                  '''
+              html_content += f'''
+                    </tbody>
+                  </table>
+                  <div class=\"footer\">
+                    <p>Generated dynamically by your Central DevSecOps Pipeline.</p>
+                    <a href=\"https://sonarcloud.io/dashboard?id={project_key}\" class=\"btn\" target=\"_blank\">Go to Live SonarCloud Dashboard</a>
                   </div>
                 </div>
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Metric Evaluated</th>
-                      <th>Status</th>
-                      <th>Actual Value</th>
-                      <th>Error Threshold</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-EOF
-
-            # Use jq to write the HTML table rows dynamically
-            jq -r '.projectStatus.conditions[] | "<tr><td class=\"metric-name\">\(.metricKey)</td><td><span class=\"badge badge-\(.status)\">\(.status)</span></td><td>\(.actualValue)</td><td>\(.errorThreshold // "N/A")</td></tr>"' sonar-raw.json >> reports/sonar_report.html
-
-            cat <<EOF >> reports/sonar_report.html
-                  </tbody>
-                </table>
-                <div class="footer">
-                  <p>Generated dynamically by your Central DevSecOps Pipeline.</p>
-                  <a href="https://sonarcloud.io/dashboard?id=${PROJECT_KEY}" class="btn" target="_blank">Go to Live SonarCloud Dashboard</a>
-                </div>
-              </div>
-            </body>
-            </html>
-EOF
-
-          else
-            echo "Failed to retrieve SonarCloud metrics. Project may not be analyzed yet." > reports/sonar-report.txt
-            echo "<h1>Failed to retrieve SonarCloud metrics.</h1>" > reports/sonar_report.html
-          fi
+              </body>
+              </html>
+              '''
+              with open('reports/sonar_report.html', 'w') as html:
+                  html.write(html_content)
+              print('Both text and HTML reports generated successfully!')
+          except Exception as e:
+              print('Generation failed:', str(e))
+              with open('reports/sonar-report.txt', 'w') as txt:
+                  txt.write('Failed to retrieve SonarCloud metrics.')
+              with open('reports/sonar_report.html', 'w') as html:
+                  html.write('<h1>Failed to retrieve SonarCloud metrics.</h1>')
+          "
 
       # Send Email Report (Packages all files inside the reports directory)
       - name: Send Email Report
