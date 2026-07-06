@@ -1,74 +1,112 @@
-name: Focus-Flow CI/CD
+name: DevSecOps Master Orchestrator
 
 on:
-  push:
-    branches:
-      - main
-      - dev
-      
-  pull_request:
-    branches:
-      - main
-      - dev
-
+  workflow_call:
+    inputs:
+      language:
+        type: string
+        default: 'javascript'
+      target-url:
+        type: string
+        default: 'https://example.com'
+      email-recipient:
+        type: string
+        required: true
   workflow_dispatch:
     inputs:
-      environment:
-        description: "Select deployment environment"
+      language:
+        description: 'CodeQL Target Language'
         required: true
-        default: "dev"
-        type: choice
-        options:
-          - dev
-          - staging
-          - prod
+        default: 'javascript'
+      target-url:
+        description: 'OWASP ZAP Scan Target URL'
+        required: true
+        default: 'https://example.com'
+      email-recipient:
+        description: 'Send test email to:'
+        required: true
+        default: 'aslahea068@gmail.com'
 
 jobs:
-  backend-ci:
-    uses: ./.github/workflows/ci-template.yml
+  # 1. CodeQL SAST Scan
+  sast-codeql:
+    permissions:
+      security-events: write
+      actions: read
+      contents: read
+    continue-on-error: true # Ensures licensing blocks do not break the pipeline
+    uses: aslahea/zero-friction-devsecops/.github/workflows/codeql.yml@main
     with:
-      service_name: focus-flow-backend
-      service_path: backend
-    secrets: inherit
+      language: ${{ github.event.inputs.language || inputs.language }}
 
-  frontend-ci:
-    uses: ./.github/workflows/ci-template.yml
-    with:
-      service_name: focus-flow-frontend
-      service_path: frontend
-    secrets: inherit
+  # 2. Trivy SCA Scan
+  sca-trivy:
+    uses: aslahea/zero-friction-devsecops/.github/workflows/trivy-fs.yml@main
 
-  task-read-ci:
-    uses: ./.github/workflows/ci-template.yml
+  # 3. OWASP ZAP DAST Scan
+  dast-zap:
+    uses: aslahea/zero-friction-devsecops/.github/workflows/zap.yml@main
     with:
-      service_name: focus-flow-task-read
-      service_path: backend/task-read-service
-    secrets: inherit
+      target-url: ${{ github.event.inputs.target-url || inputs.target-url }}
 
-  task-write-ci:
-    uses: ./.github/workflows/ci-template.yml
-    with:
-      service_name: focus-flow-task-write
-      service_path: backend/task-write-service
-    secrets: inherit
+  # 4. Aggregator & Notifier
+  notify:
+    needs: [sast-codeql, sca-trivy, dast-zap]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create Reports Directory
+        run: mkdir -p reports
 
-  docker:
-    if: github.event_name != 'pull_request'
-    needs:
-      - backend-ci
-      - frontend-ci
-      - task-read-ci
-      - task-write-ci
-    uses: ./.github/workflows/docker-template.yml
-    with:
-      tag: ${{ github.run_number }}
-    secrets: inherit
+      - name: Download Trivy Report
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: trivy-report
+          path: reports/
 
-  deploy:
-    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
-    needs: docker
-    uses: ./.github/workflows/deploy-template.yml
-    with:
-      tag: ${{ github.run_number }}
-      environment: ${{ github.event.inputs.environment || 'prod' }}
-    secrets: inherit
+      - name: Download ZAP Report
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: zap-report
+          path: reports/
+
+      # Send Email ONLY if the mail server secret is configured in the executing repo
+      - name: Send Email Report
+        if: "${{ secrets.MAIL_SERVER != '' }}"
+        uses: dawidd6/action-send-mail@v4
+        with:
+          server_address: ${{ secrets.MAIL_SERVER }}
+          server_port: ${{ secrets.MAIL_PORT }}
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          subject: "[DevSecOps Alert] Pipeline Security Reports for ${{ github.repository }}"
+          to: ${{ github.event.inputs.email-recipient || inputs.email-recipient }}
+          from: "DevSecOps Engine <${{ secrets.MAIL_USERNAME }}>"
+          body: |
+            Hello Team,
+
+            The centralized security scanning pipeline has completed execution for: ${{ github.repository }} (Branch: ${{ github.ref_name }}).
+
+            Summary of Scans:
+            1. SAST (CodeQL): Completed.
+            2. SCA (Trivy): Completed. (Trivy text report is attached).
+            3. DAST (OWASP ZAP): Completed. (ZAP HTML report is attached).
+
+            Please find the reports attached to this email.
+
+            Regards,
+            DevSecOps Governance Engine
+          attachments: |
+            reports/trivy-report.txt
+            reports/report_html.html
+
+      # Fallback log output if secrets are missing in the caller repo
+      - name: Log Notice (SMTP Not Configured in Caller Repository)
+        if: "${{ secrets.MAIL_SERVER == '' }}"
+        run: |
+          echo "========================================================="
+          echo "   SMTP credentials not configured in this repository.   "
+          echo "   Skipping email transmission to protect workflow runtime. "
+          echo "========================================================="
