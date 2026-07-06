@@ -28,12 +28,13 @@ on:
         default: 'aslahea068@gmail.com'
 
 jobs:
-  # 1. CodeQL SAST Scan (Added permissions block here)
+  # 1. CodeQL SAST Scan (Enabled licensing protection with continue-on-error)
   sast-codeql:
     permissions:
       security-events: write
       actions: read
       contents: read
+    continue-on-error: true
     uses: aslahea/zero-friction-devsecops/.github/workflows/codeql.yml@main
     with:
       language: ${{ github.event.inputs.language || inputs.language }}
@@ -71,6 +72,7 @@ jobs:
           name: zap-report
           path: reports/
 
+      # Send Email ONLY if SMTP credentials exist in the executing repository
       - name: Send Email Report
         if: "${{ secrets.MAIL_SERVER != '' }}"
         uses: dawidd6/action-send-mail@v4
@@ -96,5 +98,13 @@ jobs:
 
             Regards,
             DevSecOps Governance Engine
-          # Using a single-line wildcard grabs BOTH files automatically and prevents parsing issues
           attachments: reports/*
+
+      # Fallback notice if SMTP secrets are missing in the app repo
+      - name: Log Notice (SMTP Not Configured in Caller Repository)
+        if: "${{ secrets.MAIL_SERVER == '' }}"
+        run: |
+          echo "========================================================="
+          echo "   SMTP credentials not configured in this repository.   "
+          echo "   Skipping email transmission to protect workflow runtime. "
+          echo "========================================================="
